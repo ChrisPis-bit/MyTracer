@@ -9,14 +9,14 @@ fn main() {
 
     let mut window = Window::new(1080, 720, "Hello World");
 
-    let vertices: [f32; 18] = [
-        -1.0, -1.0, 0.0,
+    let vertices: [f32; 12] = [
+        1.0, 1.0, 0.0,
         1.0,-1.0,0.0,
-        1.0,1.0,0.0,
-        -1.0, -1.0, 0.0,
+        -1.0,-1.0,0.0,
         -1.0,1.0,0.0,
-        1.0,1.0,0.0
     ];
+
+    let indices = [0,1,3,1,2,3];
 
     window.init_gl();
 
@@ -28,16 +28,26 @@ fn main() {
 
     vbo.store_f32_data(&vertices);
 
+    let ibo = BufferObject::new(gl::ELEMENT_ARRAY_BUFFER, gl::STATIC_DRAW);
+    ibo.bind();
+
+    ibo.store_i32_data(&indices);
+
     let pos_attrib = VertexAttribute::new(0, 3, gl::FLOAT, gl::FALSE, 
         3 * size_of::<GLfloat>() as GLsizei, ptr::null());
 
     pos_attrib.enable();
+
+    let index_attrib = VertexAttribute::new(1, 3, gl::FLOAT, gl::FALSE, 
+        3 * size_of::<GLfloat>() as GLsizei, ptr::null());
+
+    index_attrib.enable();
     
     while !window.should_close() {
         unsafe {
             gl::ClearColor(0.3, 0.5, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
-            gl::DrawArrays(gl::TRIANGLES, 0, 6);
+            gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
         }
 
         window.update();
