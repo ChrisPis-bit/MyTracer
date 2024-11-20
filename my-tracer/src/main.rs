@@ -1,3 +1,4 @@
+use std::ffi::CString;
 use std::ptr;
 
 use gl::types::{GLfloat, GLsizei};
@@ -42,7 +43,20 @@ fn main() {
         3 * size_of::<GLfloat>() as GLsizei, ptr::null());
 
     index_attrib.enable();
+
+    let shader = ShaderProgram::new("src/shaders/fullscreenVert.vert", "src/shaders/fullscreenFrag.frag");
+    shader.bind();
+
+    let texture = Texture::new();
+    //let res = texture.load("src/textures/grem.jpg");
     
+    let pixels = vec![100; 1080 * 720];
+    println!("{}", pixels[50].to_string());
+    texture.set(1080, 720, pixels.as_ptr());
+
+
+    texture.bind();
+
     while !window.should_close() {
         unsafe {
             gl::ClearColor(0.3, 0.5, 0.3, 1.0);

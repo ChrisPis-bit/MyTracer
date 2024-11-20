@@ -3,11 +3,13 @@ use std::ffi::CString;
 use std::io::Read;
 use std::mem;
 use std::os::raw::*;
+use std::path::Path;
 use std::ptr;
 use std::fs::File;
 
 use cgmath::Matrix;
 use gl::types::*;
+use image::*;
 
 pub struct Vao{
     id: gl::types::GLuint,
@@ -121,7 +123,7 @@ impl VertexAttribute{
 }
 
 pub struct ShaderProgram {
-    program_handle: u32,
+    pub program_handle: u32,
     uniform_ids: HashMap<String, GLint>
 }
 
@@ -205,6 +207,96 @@ impl ShaderProgram{
                 gl::FALSE,
                 matrix.as_ptr()
             )
+        }
+    }
+}
+
+pub struct Texture{
+    pub id: GLuint
+}
+
+impl Texture{
+    pub fn new() -> Self{
+        unsafe{
+            let mut id: GLuint = 0;
+            gl::GenTextures(1, &mut id);
+            Self { id }
+        }
+    }
+
+    pub fn delete(&self){
+        unsafe{
+            gl::DeleteTextures(1, [self.id].as_ptr());
+        }
+    }
+
+    pub fn bind(&self){
+        unsafe {
+            gl::BindTexture(gl::TEXTURE_2D, self.id);
+        }
+    }
+
+    pub fn unbind(&self){
+        unsafe {
+            gl::BindTexture(gl::TEXTURE_2D, 0);
+        }
+    }
+
+    pub fn load(&self, path: &str) -> Result<(), ImageError>{
+        self.bind();
+
+        let img = image::open(&path)?.into_rgba8();
+        unsafe{
+            gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                gl::RGBA as i32,
+                img.width() as i32,
+                img.height() as i32,
+                0,
+                gl::RGBA,
+                gl::UNSIGNED_BYTE,
+                img.as_bytes().as_ptr() as *const _,
+            );
+
+            
+        // Set texture parameters
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
+
+        // Generate mipmaps (optional)
+        gl::GenerateMipmap(gl::TEXTURE_2D);
+        }
+        Ok(())
+    }
+
+    pub fn set(&self, width: i32, height: i32, data: *const i32){
+        self.bind();
+
+        unsafe{
+            gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                gl::RGBA as i32,
+                width,
+                height,
+                0,
+                gl::RGBA,
+                gl::UNSIGNED_BYTE,
+                data as *const _,
+            );
+
+            
+        // Set texture parameters
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
+
+        // Generate mipmaps (optional)
+        gl::GenerateMipmap(gl::TEXTURE_2D);
         }
     }
 }
