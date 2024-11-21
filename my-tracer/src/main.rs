@@ -2,8 +2,9 @@ use std::ffi::CString;
 use std::ptr;
 
 use gl::types::{GLfloat, GLsizei};
-use my_tracer::graphics::window::Window;
+use my_tracer::{graphics::window::Window, world::scene::Scene};
 use my_tracer::graphics::gl_wrapper::*;
+use glfw::{Action, Context, Key, WindowEvent};
 
 fn main() {
     println!("Hello, world!");
@@ -50,20 +51,31 @@ fn main() {
     let texture = Texture::new();
     //let res = texture.load("src/textures/grem.jpg");
     
-    let pixels = vec![100; 1080 * 720];
-    println!("{}", pixels[50].to_string());
-    texture.set(1080, 720, pixels.as_ptr());
+    let mut scene = Scene::new(1080, 720);
+    scene.update();
+    texture.set(1080, 720, scene.pixels.as_ptr());
 
 
     texture.bind();
 
     while !window.should_close() {
+        
+        window.process_events(|event| 
+            match event{
+                glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) =>{
+                }
+                _ => {}
+            }
+        );
+
+
+
         unsafe {
             gl::ClearColor(0.3, 0.5, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
         }
-
+        
         window.update();
     }
 

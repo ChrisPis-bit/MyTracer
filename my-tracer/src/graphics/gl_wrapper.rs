@@ -272,7 +272,7 @@ impl Texture{
         Ok(())
     }
 
-    pub fn set(&self, width: i32, height: i32, data: *const i32){
+    pub fn set(&self, width: i32, height: i32, data: *const u32){
         self.bind();
 
         unsafe{

@@ -35,12 +35,11 @@ impl Window{
     }
 
     pub fn update(&mut self){
-        self.process_events();
         self.glfw.poll_events();
         self.window_handle.swap_buffers();
     }
 
-    fn process_events(&mut self){
+    pub fn process_events(&mut self, callback: fn(WindowEvent)){
         for (_, event) in glfw::flush_messages(&self.events) {
             match event{
                 glfw::WindowEvent::FramebufferSize(width, height) =>{
@@ -51,6 +50,8 @@ impl Window{
                 }
                 _ => {}
             }
+
+            callback(event);
         }
     }
 }
