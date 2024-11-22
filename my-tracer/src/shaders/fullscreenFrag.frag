@@ -8,5 +8,5 @@ uniform sampler2D texture0;
 void main()
 {
     // Use the UV coordinates for the red and green channels, set blue to 0
-    FragColor = texture(texture0, TexCoord.yx);
+    FragColor = texture(texture0, vec2(TexCoord.x, 1 - TexCoord.y));
 }

@@ -51,12 +51,9 @@ fn main() {
     let texture = Texture::new();
     //let res = texture.load("src/textures/grem.jpg");
     
-    let mut scene = Scene::new(1080, 720);
-    scene.update();
-    texture.set(1080, 720, scene.pixels.as_ptr());
-
-
+    let mut scene = Scene::new(1080, 720, "src/textures/qwantani_dusk_1_4k.hdr");
     texture.bind();
+
 
     while !window.should_close() {
         
@@ -68,14 +65,14 @@ fn main() {
             }
         );
 
-
+        scene.update();
+        texture.set(1080, 720, scene.pixels.as_ptr());
 
         unsafe {
             gl::ClearColor(0.3, 0.5, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
         }
-        
         window.update();
     }
 

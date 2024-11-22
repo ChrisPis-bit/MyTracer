@@ -12,12 +12,23 @@ pub struct Camera{
 
 impl Camera{
     pub fn new(aspect: f32) -> Camera{
+        let pos = Point3::new(0.0,0.0,-5.0);
+        let target = Vector3::new(0.0,0.0,-1.0);
+
+        let ahead = (target - Point3::to_vec(pos)).normalize();
+        let right = (Vector3::cross(vec3(0.0, 1.0, 0.0), ahead));
+        let up = vec3(0.0, 1.0, 0.0);
+
+        let t_left = Point3::to_vec(pos) + 2.0 * ahead - aspect * right + up;
+        let t_right = Point3::to_vec(pos) + 2.0 * ahead + aspect * right + up;
+        let b_left = Point3::to_vec(pos) + 2.0 * ahead - aspect * right - up;
+
         Camera{
-        position : Point3::new(0.0,0.0,-5.0),
-        target : Vector3::new(0.0,0.0,-1.0),
-        top_left : Vector3::new(-aspect, 1.0, 0.0),
-        top_right : Vector3::new(aspect, 1.0, 0.0),
-        bottom_left : Vector3::new(-aspect, -1.0, 0.0)
+        position : pos,
+        target : target,
+        top_left : t_left,
+        top_right : t_right,
+        bottom_left : b_left
         }       
     }
 
