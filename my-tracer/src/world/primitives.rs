@@ -1,7 +1,5 @@
 use core::f32;
-
 use cgmath::*;
-use num_traits::float;
 use super::{math::Math, ray::Ray};
 
 #[derive(Copy, Clone)]
@@ -126,7 +124,7 @@ impl Sphere {
         let mut hit : bool = t < ray.dist && t > 0.0;
         if hit {
             ray.dist = t;
-            ray.objIdx = self.idx;
+            ray.obj_idx = self.idx;
             return;
         }
 
@@ -135,7 +133,7 @@ impl Sphere {
         hit = t < ray.dist && t > 0.0;
         if hit {
             ray.dist = t;
-            ray.objIdx = self.idx;
+            ray.obj_idx = self.idx;
         }
     }
 
@@ -203,7 +201,7 @@ impl Plane{
         let t = -(Vector3::dot(ray.origin, self.direction) + self.dist) / dot(ray.dir, self.direction);
         if t < ray.dist && t > 0.0 {
             ray.dist = t;
-            ray.objIdx = self.idx;
+            ray.obj_idx = self.idx;
         }
     }
 

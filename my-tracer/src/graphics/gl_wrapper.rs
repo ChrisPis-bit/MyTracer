@@ -3,7 +3,6 @@ use std::ffi::CString;
 use std::io::Read;
 use std::mem;
 use std::os::raw::*;
-use std::path::Path;
 use std::ptr;
 use std::fs::File;
 

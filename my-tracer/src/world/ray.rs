@@ -5,7 +5,7 @@ pub struct Ray{
     pub rdir: Vector3<f32>,
     pub origin: Vector3<f32>,
     pub dist: f32,
-    pub objIdx: i32
+    pub obj_idx: i32
 }
 
 impl Ray{
@@ -15,7 +15,7 @@ impl Ray{
             rdir : Vector3::new(1.0 / dir.x, 1.0 / dir.y, 1.0 / dir.z),
             origin : origin,
             dist : dist,
-            objIdx : -1
+            obj_idx : -1
         }
     }
 }

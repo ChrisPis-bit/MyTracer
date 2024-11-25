@@ -1,10 +1,10 @@
-use std::ffi::CString;
 use std::ptr;
-
+use cgmath::{Vector3, Zero};
 use gl::types::{GLfloat, GLsizei};
+use my_tracer::world::math::Math;
 use my_tracer::{graphics::window::Window, world::scene::Scene};
 use my_tracer::graphics::gl_wrapper::*;
-use glfw::{Action, Context, Key, WindowEvent};
+use glfw::{Action, Key};
 
 fn main() {
     println!("Hello, world!");
@@ -56,7 +56,8 @@ fn main() {
 
     texture.bind();
 
-    let mut pixels = vec![0; 1080 * 720];
+    let mut pixels: Vec<Vector3<f32>> = vec![Vector3::zero(); 1080 * 720];
+    let mut pixels_rgb8 = vec![0; 1080 * 720];
 
     while !window.should_close() {
         
@@ -69,7 +70,11 @@ fn main() {
         );
 
         scene.update(&mut pixels);
-        texture.set(1080, 720, pixels.as_ptr());
+        for i in 0..pixels.len(){
+            pixels_rgb8[i] = Math::rgbf32_to_rgb8(pixels[i]);
+        }
+
+        texture.set(1080, 720, pixels_rgb8.as_ptr());
 
         unsafe {
             gl::ClearColor(0.3, 0.5, 0.3, 1.0);

@@ -32,8 +32,6 @@ impl Camera{
         }       
     }
 
-
-
     pub fn calculate_primary_ray(&self, x: f32, y: f32) -> Ray {
         let p = self.top_left + x * (self.top_right - self.top_left) + y * (self.bottom_left - self.top_left);
         Ray::new(self.position, (p - self.position).normalize(), f32::max_value())
