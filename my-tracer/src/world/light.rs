@@ -2,6 +2,7 @@ use cgmath::{vec3, Point3, Vector3};
 
 use super::{math::Math, primitives::Sphere};
 
+#[derive(Copy, Clone)]
 pub enum Light {
     Point(PointLight),
     //Sphere(Sphere)
@@ -30,6 +31,7 @@ impl Light {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct PointLight{
     idx: i32,
     color : Vector3<f32>,

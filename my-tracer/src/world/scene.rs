@@ -5,6 +5,7 @@ use cgmath::*;
 use image::{ImageBuffer, Rgb};
 use num_traits::zero;
 use rand::{rngs::ThreadRng, Rng};
+use rayon::prelude::*;
 
 use super::{camera::Camera, light::{Light, PointLight}, math::Math, primitives::{Object, Plane, Sphere}, ray::Ray};
 
@@ -14,15 +15,14 @@ pub struct Scene {
     camera : Camera,
     primitives : Vec<Object>,
     lights: Vec<Light>,
-    pub pixels: Vec<u32>,
     accumulated: i32,
-    width: i32,
-    height: i32,
+    width: u32,
+    height: u32,
     skybox: ImageBuffer<Rgb<f32>, Vec<f32>>,
 }
 
 impl Scene{
-    pub fn new(width: i32, height:i32, skybox_path : &str) -> Scene{
+    pub fn new(width: u32, height:u32, skybox_path : &str) -> Scene{
         let mut texture = image::open(&skybox_path).unwrap().into_rgb32f();
         
         // Adjusts HDR values
@@ -42,7 +42,6 @@ impl Scene{
             lights: vec![
                 Light::Point(PointLight::new(0, vec3(1000.0, 1000.0, 1000.0), point3(0.0, 30.0, 7.0)))
             ],
-            pixels: vec![0; (width * height) as usize],
             accumulated: 0,
             width: width,
             height: height,
@@ -50,22 +49,22 @@ impl Scene{
         }
     }
 
-    pub fn update(&mut self){
+    pub fn update(&mut self, pixels: &mut Vec<u32>){
         let base_seed = Math::random_seed_uint();
 
-        for x  in 0..self.width as u32 {
-            let mut seed = (x + 1) * 17;
+        let accum = self.accumulated;
+
+        pixels.par_iter_mut().enumerate().for_each(|(i, pixel)| {
+            let x = i as u32 % self.width;
+            let y = i as u32 / self.width;
+            let mut seed = (x + 1) * 17 * y;
             seed = u32::wrapping_add(base_seed, seed);
 
-            for y in 0..self.height  as u32{
-                let mut primary_ray = self.camera.calculate_primary_ray((x as f32)/(self.width as f32), (y as f32)/(self.height as f32));
+            let mut primary_ray = self.camera.calculate_primary_ray((x as f32)/(self.width as f32), (y as f32)/(self.height as f32));
 
-                let color = self.ray_color(&mut primary_ray, &mut seed, 0);
-                self.pixels[(x + y * self.width as u32) as usize] = Scene::rgbf32_to_rgb8((color + Scene::rgb8_to_rgbf32(self.pixels[(x + y * self.width as u32) as usize]) * (self.accumulated as f32)) / (self.accumulated as f32 + 1.0));
-                //self.pixels[x + y * self.width as usize] = Scene::rgbf32_to_rgb8(color );
-            }
-        }
-
+            let color = self.ray_color(&mut primary_ray, &mut seed, 0);
+            *pixel = Scene::rgbf32_to_rgb8((color + Scene::rgb8_to_rgbf32(*pixel) * (accum as f32)) / (accum as f32 + 1.0));
+        });
         self.accumulated += 1;
     }
 
@@ -75,7 +74,7 @@ impl Scene{
         }
     }
 
-    pub fn ray_color(&mut self, ray: &mut Ray, seed: &mut u32, depth: u32) -> Vector3<f32>{
+    pub fn ray_color(&self, ray: &mut Ray, seed: &mut u32, depth: u32) -> Vector3<f32>{
         self.intersect_ray(ray);
 
         if ray.objIdx < 0 { 
@@ -123,9 +122,9 @@ impl Scene{
         Vector3::new(r, g, b)
     }
 
-    pub fn sample_random_light(&mut self, seed: &mut u32) -> &Light {
+    pub fn sample_random_light(&self, seed: &mut u32) -> Light {
         let random_index = Math::random_range_u32(seed, 0,self.lights.len() as u32 - 1);
-        &self.lights[random_index as usize]
+        self.lights[random_index as usize]
     }
 
     pub fn sample_skybox(&self, dir :Vector3<f32>) -> Vector3<f32>{

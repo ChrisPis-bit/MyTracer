@@ -54,6 +54,7 @@ fn main() {
     let mut scene = Scene::new(1080, 720, "src/textures/qwantani_dusk_1_4k.hdr");
     texture.bind();
 
+    let mut pixels = vec![0; 1080 * 720];
 
     while !window.should_close() {
         
@@ -65,8 +66,8 @@ fn main() {
             }
         );
 
-        scene.update();
-        texture.set(1080, 720, scene.pixels.as_ptr());
+        scene.update(&mut pixels);
+        texture.set(1080, 720, pixels.as_ptr());
 
         unsafe {
             gl::ClearColor(0.3, 0.5, 0.3, 1.0);
