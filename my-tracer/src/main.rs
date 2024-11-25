@@ -52,6 +52,8 @@ fn main() {
     //let res = texture.load("src/textures/grem.jpg");
     
     let mut scene = Scene::new(1080, 720, "src/textures/qwantani_dusk_1_4k.hdr");
+    scene.build();
+
     texture.bind();
 
     let mut pixels = vec![0; 1080 * 720];

@@ -1,6 +1,10 @@
-use cgmath::*;
-use super::ray::Ray;
+use core::f32;
 
+use cgmath::*;
+use num_traits::float;
+use super::{math::Math, ray::Ray};
+
+#[derive(Copy, Clone)]
 pub enum Object {
     Sphere(Sphere),
     Cube(Cube),
@@ -8,6 +12,30 @@ pub enum Object {
 }
 
 impl Object{
+    pub fn set_light(&mut self, is_light: bool){
+        match self {
+            Object::Cube(ref mut c) => {},
+            Object::Sphere(ref mut s) => s.is_light = is_light,
+            Object::Plane(ref mut p) => p.is_light = is_light,
+        }
+    }
+
+    pub fn is_light(&self) -> bool {
+        match self {
+            Object::Cube(c) => false,
+            Object::Sphere(s) => s.is_light,
+            Object::Plane(p) => p.is_light,
+        }
+    }
+
+    pub fn set_idx(&mut self, idx: i32){
+        match self {
+            Object::Cube(ref mut c) => c.idx = idx,
+            Object::Sphere(ref mut s) => s.idx = idx,
+            Object::Plane(ref mut p) => p.idx = idx,
+        }
+    }
+
     pub fn idx(&self) -> i32{
         match self {
             Object::Cube(c) => c.idx,
@@ -25,7 +53,7 @@ impl Object{
         }
     }
     
-    pub fn get_albedo(&self, pos:Point3<f32>) -> Vector3<f32> {
+    pub fn get_albedo(&self, pos:Vector3<f32>) -> Vector3<f32> {
         match self {
             Object::Cube(c) => vec3(1.0, 1.0, 0.0),
             Object::Sphere(s) => s.get_albedo(pos),
@@ -33,30 +61,50 @@ impl Object{
         }
     }
 
-    pub fn get_normal(&self, pos:Point3<f32>) -> Vector3<f32> {
+    pub fn get_normal(&self, pos:Vector3<f32>) -> Vector3<f32> {
         match self {
             Object::Cube(c) => vec3(1.0, 1.0, 0.0),
             Object::Sphere(s) => s.get_normal(pos),
             Object::Plane(p) => p.get_normal(pos),
         }
     }
+
+    pub fn get_random_position(&self, seed: &mut u32) -> Vector3<f32>{
+        match self {
+            Object::Cube(c) => Vector3::zero(),
+            Object::Sphere(s) => s.get_random_position(seed),
+            Object::Plane(p) => Vector3::zero(),
+        }
+    }
+
+    pub fn get_area(&self) -> f32{
+        match self {
+            Object::Cube(c) => 1.0,
+            Object::Sphere(s) => s.get_area(),
+            Object::Plane(p) => p.get_area(),
+        }
+    }
 }
 
+#[derive(Copy, Clone)]
 pub struct Sphere{
     pub idx: i32,
-    position: Point3<f32>,
+    position: Vector3<f32>,
     r: f32,
-    r2: f32
-
+    r2: f32,
+    color: Vector3<f32>,
+    pub is_light: bool,
 }
 
 impl Sphere {
-    pub fn new(id: i32, position: Point3<f32>, size: f32) -> Sphere {
+    pub fn new(position: Vector3<f32>, size: f32, color: Vector3<f32>) -> Sphere {
         Sphere {
-            idx : id,
+            idx : 0,
             position : position,
             r : size,
             r2 : size * size,
+            color: color,
+            is_light: false,
         }
     }
 
@@ -91,26 +139,35 @@ impl Sphere {
         }
     }
 
-    pub fn get_normal(&self, p:Point3<f32>) -> Vector3<f32> {
+    pub fn get_normal(&self, p:Vector3<f32>) -> Vector3<f32> {
         (p - self.position) * self.r2
     }
 
-    pub fn get_albedo(&self, p:Point3<f32>) -> Vector3<f32> {
-        vec3(1.0, 0.0, 0.0)
+    pub fn get_albedo(&self, p:Vector3<f32>) -> Vector3<f32> {
+        self.color
+    }
+
+    pub fn get_random_position(&self, seed: &mut u32) -> Vector3<f32>{
+        Math::random_uniform_vectorf32(seed) * self.r + self.position
+    }
+
+    pub fn get_area(&self) -> f32{
+        self.r2 * f32::consts::PI * 4.0
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Cube{
     idx: i32,
     m: Matrix4<f32>,
     inv_m: Matrix4<f32>,
-    size: f32
+    size: f32,
 }
 
 impl Cube {
-    pub fn new(id: i32, m: Matrix4<f32>, size: f32) -> Cube {
+    pub fn new(m: Matrix4<f32>, size: f32) -> Cube {
         Cube {
-            idx : id,
+            idx : 0,
             m : m,
             inv_m : m.invert().unwrap(),
             size : size
@@ -122,34 +179,43 @@ impl Cube {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Plane{
     idx: i32,
     dist: f32,
     direction: Vector3<f32>,
+    color: Vector3<f32>,
+    pub is_light: bool,
 }
 
 impl Plane{
-    pub fn new(id: i32, dist: f32, direction: Vector3<f32>) -> Plane {
+    pub fn new(dist: f32, direction: Vector3<f32>, color: Vector3<f32>) -> Plane {
         Plane {
-            idx : id,
+            idx : 0,
             dist : dist,
             direction : direction,
+            color: color,
+            is_light: false
         }
     }
 
     pub fn intersect(&self, ray: &mut Ray) {
-        let t = -(Vector3::dot(Point3::to_vec(ray.origin), self.direction) + self.dist) / dot(ray.dir, self.direction);
+        let t = -(Vector3::dot(ray.origin, self.direction) + self.dist) / dot(ray.dir, self.direction);
         if t < ray.dist && t > 0.0 {
             ray.dist = t;
             ray.objIdx = self.idx;
         }
     }
 
-    pub fn get_normal(&self, p:Point3<f32>) -> Vector3<f32> {
+    pub fn get_normal(&self, p:Vector3<f32>) -> Vector3<f32> {
         self.direction
     }
 
-    pub fn get_albedo(&self, p:Point3<f32>) -> Vector3<f32> {
-        vec3(0.5, 0.5, 0.5)
+    pub fn get_albedo(&self, p:Vector3<f32>) -> Vector3<f32> {
+        self.color
+    }
+
+    pub fn get_area(&self) -> f32{
+        f32::MAX
     }
 }
