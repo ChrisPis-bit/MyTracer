@@ -1,5 +1,6 @@
 use cgmath::*;
 
+#[derive(Copy, Clone)]
 pub struct Ray{
     pub dir: Vector3<f32>,
     pub rdir: Vector3<f32>,

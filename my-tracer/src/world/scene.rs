@@ -12,7 +12,7 @@ pub struct Scene {
     camera : Camera,
     primitives : Vec<Object>,
     lights: Vec<i32>,
-    accumulated: i32,
+    accumulated: f32,
     width: u32,
     height: u32,
     skybox: ImageBuffer<Rgb<f32>, Vec<f32>>,
@@ -35,7 +35,7 @@ impl Scene{
             camera: Camera::new((width as f32) / (height as f32)),
             primitives: Vec::new(),
             lights: Vec::new(),
-            accumulated: 0,
+            accumulated: 0.0,
             width: width,
             height: height,
             skybox: texture,
@@ -57,14 +57,21 @@ impl Scene{
 
     pub fn build(&mut self){
         self.add_object(Object::Plane(Plane::new(1.0, vec3(0.0, 1.0, 0.0), vec3(0.8, 0.8, 0.8)))); // Ground
+        // self.add_object(Object::Plane(Plane::new(5.0, vec3(0.0, -1.0, 0.0), vec3(0.8, 0.8, 0.8))));
+        // self.add_object(Object::Plane(Plane::new(5.0, vec3(-1.0, 0.0, 0.0), vec3(0.8, 0.8, 0.8)))); 
+        // self.add_object(Object::Plane(Plane::new(5.0, vec3(1.0, 0.0, 0.0), vec3(0.8, 0.8, 0.8)))); 
+        // self.add_object(Object::Plane(Plane::new(10.0, vec3(0.0, 0.0, -1.0), vec3(0.8, 0.8, 0.8)))); 
+        // self.add_object(Object::Plane(Plane::new(10.0, vec3(0.0, 0.0, 1.0), vec3(0.8, 0.8, 0.8)))); 
+
+
 
         self.add_object(Object::Sphere(Sphere::new(vec3(-2.5, 0.0, 8.0), 1.0, vec3(0.1, 0.75, 0.75))));
         self.add_object(Object::Sphere(Sphere::new(vec3(0.0, 0.0, 8.0), 1.0, vec3(0.75, 0.1, 0.75))));
         self.add_object(Object::Sphere(Sphere::new(vec3(2.5, 0.0, 8.0), 1.0, vec3(0.75, 0.75, 0.1))));
 
 
-        self.add_light(Object::Sphere(Sphere::new(vec3(-3.8, 2.0, 8.0), 0.5, vec3(15.0, 5.0, 5.0))));
-        self.add_light(Object::Sphere(Sphere::new(vec3(3.8, 2.0, 8.0), 0.5, vec3(5.0, 5.0, 15.0))));
+        self.add_light(Object::Sphere(Sphere::new(vec3(-3.8, 2.0, 8.0), 0.5, vec3(15.0, 3.0, 2.0))));
+        self.add_light(Object::Sphere(Sphere::new(vec3(3.8, 2.0, 8.0), 0.5, vec3(2.0, 3.0, 15.0))));
 
     }
 
@@ -73,18 +80,22 @@ impl Scene{
 
         let accum = self.accumulated;
 
+        let f_width = self.width as f32;
+        let f_height = self.height as f32;
+
         pixels.par_iter_mut().enumerate().for_each(|(i, pixel)| {
-            let x = i as u32 % self.width;
-            let y = i as u32 / self.width;
             let mut seed =  (i as u32).wrapping_add(base_seed).wrapping_mul(17).wrapping_add(1);
             seed = Math::wang_hash(seed);
 
-            let mut primary_ray = self.camera.calculate_primary_ray((x as f32)/(self.width as f32), (y as f32)/(self.height as f32));
+            let x = (i as f32 % f_width) + Math::random_f32(&mut seed) - 0.5;
+            let y = (i as f32 / f_width) + Math::random_f32(&mut seed) - 0.5;
 
-            let color = self.ray_color(&mut primary_ray, &mut seed, 0);
-            *pixel = (vec3(color.z, color.y, color.x) + *pixel * (accum as f32)) / (accum as f32 + 1.0);
+            let mut primary_ray = self.camera.calculate_primary_ray(x / f_width, y / f_height);
+
+            let color = self.ray_color(&mut primary_ray, &mut seed);
+            *pixel = (vec3(color.z, color.y, color.x) + *pixel * accum) / (accum + 1.0);
         });
-        self.accumulated += 1;
+        self.accumulated += 1.0;
     }
 
     fn intersect_ray(&self, ray: &mut Ray) {
@@ -93,73 +104,82 @@ impl Scene{
         }
     }
 
-    fn ray_color(&self, ray: &mut Ray, seed: &mut u32, depth: u32) -> Vector3<f32>{
-        self.intersect_ray(ray);
+    fn ray_color(&self, ray: &mut Ray, seed: &mut u32) -> Vector3<f32>{
+        let mut depth = 0;
 
-        if ray.obj_idx < 0 { 
-            return self.sample_skybox(ray.dir);
+        let mut T = vec3(1.0,1.0,1.0);
+        let mut E = vec3(0.0, 0.0, 0.0);
+
+        while true {
+            self.intersect_ray(ray);
+
+            if ray.obj_idx < 0 { 
+                E += T.mul_element_wise(self.sample_skybox(ray.dir));
+                break;
+            }
+
+            // Intersection data
+            let primitive = &self.primitives[ray.obj_idx as usize];
+            let I = ray.origin + ray.dir * ray.dist;
+            let albedo = primitive.get_albedo(I);
+
+            // If intersecting with light, simply return light color
+            if primitive.is_light() && depth == 0{
+                if depth == 0{
+                    E += albedo;
+                    break;
+                }
+                else {
+                    break;
+                }
+            }
+
+            let normal = primitive.get_normal(I);
+            let R = Math::random_uniform_hemisphere_vectorf32(seed, normal);
+
+            // Light data
+            let light = self.sample_random_light(seed);
+            let mut L = light.get_random_position(normal, seed) - I;
+            let light_normal = light.get_normal(I);
+            let light_pdf = light.get_light_pdf();
+            let dist_to_light = L.magnitude();
+            L = L.normalize();
+
+
+            let BRDF = albedo * f32::consts::FRAC_1_PI;
+
+            // Check light direction
+            let cos_o = light_normal.dot(-L);
+            let cos_i = normal.dot(L);
+
+            if cos_o > 0.0 && cos_i > 0.0 {
+                // Shadows
+                let mut shadow_ray = Ray::new(I + L * EPSILON, L, dist_to_light - EPSILON * 2.0);
+                self.intersect_ray(&mut shadow_ray);
+
+                // NEE
+                if shadow_ray.obj_idx == -1 {   
+                    let light_color = light.get_albedo(I);
+                    let light_area = light.get_area();
+                    let solid_angle = (light_area * cos_o) / (dist_to_light * dist_to_light);
+
+                    E += T.mul_element_wise(light_color.mul_element_wise(BRDF * solid_angle * cos_i * self.lights.len() as f32 * light_pdf)) ;
+                }
+            }
+   
+            // Russian Roulette
+            let p = Scene::ray_survival_probability(T);
+            if p < Math::random_f32(seed) { break; }
+
+            // Indirect bounces
+            *ray = Ray::new(I + R * EPSILON, R, f32::MAX);
+
+            T = T.mul_element_wise(BRDF.mul_element_wise(normal.dot(R) * 2.0 * f32::consts::PI)) / p;
+
+            depth += 1;
         }
 
-
-        // Intersection data
-        let primitive = &self.primitives[ray.obj_idx as usize];
-        let I = ray.origin + ray.dir * ray.dist;
-        let albedo = primitive.get_albedo(I);
-
-        // If intersecting with light, simply return light color
-        if primitive.is_light() && depth == 0{
-            if depth == 0{
-                return albedo;
-            }
-            else {
-                return Vector3::zero();
-            }
-        }
-
-        // Russian Roulette
-        let p = Scene::ray_survival_probability(albedo);
-        if p < Math::random_f32(seed) { return Vector3::zero(); }
-
-        let normal = primitive.get_normal(I);
-        let R = Math::random_uniform_hemisphere_vectorf32(seed, normal);
-
-        // Light data
-        let light = self.sample_random_light(seed);
-        let mut L = light.get_random_position(seed) - I;
-        let light_normal = light.get_normal(I);
-        let dist_to_light = L.magnitude();
-        L = L.normalize();
-
-
-        let BRDF = albedo * f32::consts::FRAC_1_PI;
-
-        let mut ld : Vector3<f32> = Vector3::zero();
-
-        // Check light direction
-        let cos_o = light_normal.dot(-L);
-        let cos_i = normal.dot(L);
-
-        if cos_o > 0.0 && cos_i > 0.0 {
-
-            // Shadows
-            let mut shadow_ray = Ray::new(I + L * EPSILON, L, dist_to_light - EPSILON * 2.0);
-            self.intersect_ray(&mut shadow_ray);
-
-            // NEE
-            if shadow_ray.obj_idx == -1 {   
-                let light_color = light.get_albedo(I);
-                let light_area = light.get_area();
-                let solid_angle = (light_area * cos_o) / (dist_to_light * dist_to_light);
-
-                ld = light_color.mul_element_wise(BRDF * solid_angle * cos_i * self.lights.len() as f32) ;
-            }
-        }
-
-        // Indirect bounces
-        let mut indirect_ray = Ray::new(I + R * EPSILON, R, f32::MAX);
-        let ei = self.ray_color(&mut indirect_ray, seed, depth + 1) * normal.dot(R);
-
-        (BRDF.mul_element_wise(2.0 * f32::consts::PI * ei) + ld) / p
+        return E;
     }
 
     fn ray_survival_probability(color: Vector3<f32>) -> f32{

@@ -67,10 +67,10 @@ impl Object{
         }
     }
 
-    pub fn get_random_position(&self, seed: &mut u32) -> Vector3<f32>{
+    pub fn get_random_position(&self, normal: Vector3<f32>, seed: &mut u32) -> Vector3<f32>{
         match self {
             Object::Cube(c) => Vector3::zero(),
-            Object::Sphere(s) => s.get_random_position(seed),
+            Object::Sphere(s) => s.get_random_position(normal, seed),
             Object::Plane(p) => Vector3::zero(),
         }
     }
@@ -80,6 +80,14 @@ impl Object{
             Object::Cube(c) => 1.0,
             Object::Sphere(s) => s.get_area(),
             Object::Plane(p) => p.get_area(),
+        }
+    }
+
+    pub fn get_light_pdf(&self) -> f32{
+        match self {
+            Object::Cube(c) => 1.0,
+            Object::Sphere(s) => 0.5, // We only sample hemisphere facing the surface
+            Object::Plane(p) =>  1.0,
         }
     }
 }
@@ -145,8 +153,8 @@ impl Sphere {
         self.color
     }
 
-    pub fn get_random_position(&self, seed: &mut u32) -> Vector3<f32>{
-        Math::random_uniform_vectorf32(seed) * self.r + self.position
+    pub fn get_random_position(&self, normal: Vector3<f32>, seed: &mut u32) -> Vector3<f32>{
+        Math::random_uniform_hemisphere_vectorf32(seed, -normal) * self.r + self.position
     }
 
     pub fn get_area(&self) -> f32{

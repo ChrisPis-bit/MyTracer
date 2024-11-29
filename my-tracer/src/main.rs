@@ -7,8 +7,6 @@ use my_tracer::graphics::gl_wrapper::*;
 use glfw::{Action, Key};
 
 fn main() {
-    println!("Hello, world!");
-
     let mut window = Window::new(1080, 720, "Hello World");
 
     let vertices: [f32; 12] = [
@@ -22,45 +20,43 @@ fn main() {
 
     window.init_gl();
 
+    // Create fullscreen quad to display resulting render
     let vao = Vao::new();
     vao.bind();
 
     let vbo = BufferObject::new(gl::ARRAY_BUFFER, gl::STATIC_DRAW);
     vbo.bind();
-
     vbo.store_f32_data(&vertices);
 
     let ibo = BufferObject::new(gl::ELEMENT_ARRAY_BUFFER, gl::STATIC_DRAW);
     ibo.bind();
-
     ibo.store_i32_data(&indices);
 
     let pos_attrib = VertexAttribute::new(0, 3, gl::FLOAT, gl::FALSE, 
         3 * size_of::<GLfloat>() as GLsizei, ptr::null());
-
     pos_attrib.enable();
 
     let index_attrib = VertexAttribute::new(1, 3, gl::FLOAT, gl::FALSE, 
         3 * size_of::<GLfloat>() as GLsizei, ptr::null());
-
     index_attrib.enable();
 
     let shader = ShaderProgram::new("src/shaders/fullscreenVert.vert", "src/shaders/fullscreenFrag.frag");
     shader.bind();
 
     let texture = Texture::new();
-    //let res = texture.load("src/textures/grem.jpg");
     
+    // Setup scene
     let mut scene = Scene::new(1080, 720, "src/textures/qwantani_dusk_1_4k.hdr");
     scene.build();
 
     texture.bind();
 
+    // Initialize pixel arrays
     let mut pixels: Vec<Vector3<f32>> = vec![Vector3::zero(); 1080 * 720];
     let mut pixels_rgb8 = vec![0; 1080 * 720];
 
     while !window.should_close() {
-        
+        // Events, TODO: add camera movement
         window.process_events(|event| 
             match event{
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) =>{
@@ -69,6 +65,7 @@ fn main() {
             }
         );
 
+        // Update scene anc convert render results into rgb8
         scene.update(&mut pixels);
         for i in 0..pixels.len(){
             pixels_rgb8[i] = Math::rgbf32_to_rgb8(pixels[i]);
@@ -76,6 +73,7 @@ fn main() {
 
         texture.set(1080, 720, pixels_rgb8.as_ptr());
 
+        // Draw fullscreen quad
         unsafe {
             gl::ClearColor(0.3, 0.5, 0.3, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT);
