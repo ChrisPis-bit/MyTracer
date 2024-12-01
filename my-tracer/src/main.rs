@@ -1,13 +1,16 @@
 use std::ptr;
+use std::time::Instant;
 use cgmath::{Vector3, Zero};
+use egui::{vec2, Pos2, Rect};
 use gl::types::{GLfloat, GLsizei};
 use my_tracer::world::math::Math;
 use my_tracer::{graphics::window::Window, world::scene::Scene};
 use my_tracer::graphics::gl_wrapper::*;
-use glfw::{Action, Key};
+use glfw::{Action, Key, WindowEvent};
 
 fn main() {
     let mut window = Window::new(1080, 720, "Hello World");
+    window.init_gl();
 
     let vertices: [f32; 12] = [
         1.0, 1.0, 0.0,
@@ -18,7 +21,22 @@ fn main() {
 
     let indices = [0,1,3,1,2,3];
 
-    window.init_gl();
+
+    let mut egui_painter = egui_gl_glfw::Painter::new(&mut window.window_handle);
+    let egui_ctx = egui::Context::default();
+
+    let (width, height) = window.window_handle.get_framebuffer_size();
+    let native_pixels_per_point = window.window_handle.get_content_scale().0;
+
+    let mut egui_input_state = egui_gl_glfw::EguiInputState::new(
+        egui::RawInput{
+            screen_rect: Some(Rect::from_min_size(
+                Pos2::new(0f32, 0f32),
+                vec2(width as f32, height as f32) / native_pixels_per_point,
+
+            )),
+            ..Default::default()
+        }, native_pixels_per_point);
 
     // Create fullscreen quad to display resulting render
     let vao = Vao::new();
@@ -55,30 +73,68 @@ fn main() {
     let mut pixels: Vec<Vector3<f32>> = vec![Vector3::zero(); 1080 * 720];
     let mut pixels_rgb8 = vec![0; 1080 * 720];
 
-    while !window.should_close() {
-        // Events, TODO: add camera movement
-        window.process_events(|event| 
-            match event{
-                glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) =>{
-                }
-                _ => {}
-            }
-        );
+    let start_time = Instant::now();
 
+    let mut a = 1.0;
+    while !window.should_close() {
+        egui_input_state.input.time = Some(start_time.elapsed().as_secs_f64());
+        egui_ctx.begin_pass(egui_input_state.input.take());
+        egui_input_state.pixels_per_point = native_pixels_per_point;
+
+        unsafe {
+            gl::ClearColor(0.3, 0.5, 0.3, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+        }
+        
         // Update scene anc convert render results into rgb8
         scene.update(&mut pixels);
         for i in 0..pixels.len(){
             pixels_rgb8[i] = Math::rgbf32_to_rgb8(pixels[i]);
         }
 
+        unsafe {          
+            gl::Disable(gl::BLEND);
+        }
         texture.set(1080, 720, pixels_rgb8.as_ptr());
+        vao.bind();
+        vbo.bind();
+        ibo.bind();
+        shader.bind();
 
-        // Draw fullscreen quad
+        // Draw fullscreen quad     
         unsafe {
-            gl::ClearColor(0.3, 0.5, 0.3, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
         }
+
+        egui::Window::new("Egui with GLFW").show(&egui_ctx, |ui| {
+            ui.label("A simple sine wave plotted onto a GL texture then blitted to an egui managed Image.");
+            ui.label(" ");
+            ui.label(" ");            
+            ui.add(egui::Slider::new(&mut a, 0.0..=50.0).text("Amplitude"));
+            ui.label(" ");
+        });
+
+        let egui::FullOutput {
+            platform_output,
+            textures_delta,
+            shapes,
+            pixels_per_point,
+            viewport_output: _,
+        } = egui_ctx.end_pass();
+
+        //Handle cut, copy text from egui
+        if !platform_output.copied_text.is_empty() {
+            egui_gl_glfw::copy_to_clipboard(&mut egui_input_state, platform_output.copied_text);
+        }
+
+        let clipped_shapes = egui_ctx.tessellate(shapes, pixels_per_point);
+        egui_painter.paint_and_update_textures(1.0, &clipped_shapes, &textures_delta);
+
+        // Events, TODO: add camera movement
+        window.process_events(&mut egui_input_state,|event : &WindowEvent| {
+        }
+        );
+        
         window.update();
     }
 

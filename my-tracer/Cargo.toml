@@ -5,8 +5,10 @@ edition = "2021"
 
 [dependencies]
 cgmath = "0.18.0"
+egui_gl_glfw = "0.1.6"
 gl = "0.14.0"
 glfw = "0.58.0"
 image = "0.25.5"
 rand = "0.8.5"
 rayon = "1.10.0"
+egui = "0.29.1"
