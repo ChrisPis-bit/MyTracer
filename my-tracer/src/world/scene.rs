@@ -16,12 +16,18 @@ pub struct Scene {
     width: u32,
     height: u32,
     skybox: ImageBuffer<Rgb<f32>, Vec<f32>>,
+    sky_width: f32,
+    sky_height: f32,
+    aspect: f32
 }
 
 impl Scene{
     pub fn new(width: u32, height:u32, skybox_path : &str) -> Scene{
         let mut texture = image::open(&skybox_path).unwrap().into_rgb32f();
         
+        let sky_width = texture.width() as f32;
+        let sky_height = texture.height() as f32;
+
         // Adjusts HDR values
         for x in 0..texture.width(){
             for y in 0..texture.height(){
@@ -39,6 +45,9 @@ impl Scene{
             width: width,
             height: height,
             skybox: texture,
+            sky_width: sky_width,
+            sky_height: sky_height,
+            aspect: (width as f32) / (height as f32)
         }
     }
 
@@ -63,8 +72,6 @@ impl Scene{
         // self.add_object(Object::Plane(Plane::new(10.0, vec3(0.0, 0.0, -1.0), vec3(0.8, 0.8, 0.8)))); 
         // self.add_object(Object::Plane(Plane::new(10.0, vec3(0.0, 0.0, 1.0), vec3(0.8, 0.8, 0.8)))); 
 
-
-
         self.add_object(Object::Sphere(Sphere::new(vec3(-2.5, 0.0, 8.0), 1.0, vec3(0.1, 0.75, 0.75))));
         self.add_object(Object::Sphere(Sphere::new(vec3(0.0, 0.0, 8.0), 1.0, vec3(0.75, 0.1, 0.75))));
         self.add_object(Object::Sphere(Sphere::new(vec3(2.5, 0.0, 8.0), 1.0, vec3(0.75, 0.75, 0.1))));
@@ -75,7 +82,10 @@ impl Scene{
 
     }
 
-    pub fn update(&mut self, pixels: &mut Vec<Vector3<f32>>){
+    pub fn update(&mut self, delta_time: f32, pixels: &mut Vec<Vector3<f32>>, pixels_rgb8: &mut Vec<u32>){
+        if self.camera.update(delta_time, self.aspect) {self.accumulated = 0.0;}
+
+
         let base_seed = Math::random_seed_uint();
 
         let accum = self.accumulated;
@@ -83,7 +93,7 @@ impl Scene{
         let f_width = self.width as f32;
         let f_height = self.height as f32;
 
-        pixels.par_iter_mut().enumerate().for_each(|(i, pixel)| {
+        pixels.par_iter_mut().zip(pixels_rgb8.par_iter_mut()).enumerate().for_each(|(i, (pixel, pixel_rgb8))| {
             let mut seed =  (i as u32).wrapping_add(base_seed).wrapping_mul(17).wrapping_add(1);
             seed = Math::wang_hash(seed);
 
@@ -94,6 +104,7 @@ impl Scene{
 
             let color = self.ray_color(&mut primary_ray, &mut seed);
             *pixel = (vec3(color.z, color.y, color.x) + *pixel * accum) / (accum + 1.0);
+            *pixel_rgb8 = Math::rgbf32_to_rgb8(*pixel);
         });
         self.accumulated += 1.0;
     }
@@ -119,7 +130,7 @@ impl Scene{
             }
 
             // Intersection data
-            let primitive = &self.primitives[ray.obj_idx as usize];
+            let primitive = self.primitives[ray.obj_idx as usize];
             let I = ray.origin + ray.dir * ray.dist;
             let albedo = primitive.get_albedo(I);
 
@@ -193,8 +204,8 @@ impl Scene{
 
     fn sample_skybox(&self, dir :Vector3<f32>) -> Vector3<f32>{
         let phi = f32::atan2(dir.z, dir.x);
-        let u = (self.skybox.width() as f32 * (if phi > 0.0 { phi } else {(phi + 2.0 * f32::consts::PI)}) * (f32::consts::FRAC_1_PI / 2.0) - 0.5) as u32;
-        let v = (self.skybox.height() as f32 * f32::acos(dir.y) * f32::consts::FRAC_1_PI - 0.5) as u32;
+        let u = (self.sky_width * (if phi > 0.0 { phi } else {(phi + 2.0 * f32::consts::PI)}) * (f32::consts::FRAC_1_PI / 2.0) - 0.5) as u32;
+        let v = (self.sky_height * f32::acos(dir.y) * f32::consts::FRAC_1_PI - 0.5) as u32;
         //let skyIdx = (u + v * self.skybox.width()) % (self.skybox.width() * self.skybox.height());
         let color = self.skybox[(u, v)];
         vec3(color[0],color[1], color[2])

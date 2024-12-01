@@ -3,6 +3,7 @@ use std::time::Instant;
 use cgmath::{Vector3, Zero};
 use egui::{vec2, Pos2, Rect};
 use gl::types::{GLfloat, GLsizei};
+use my_tracer::world::camera;
 use my_tracer::world::math::Math;
 use my_tracer::{graphics::window::Window, world::scene::Scene};
 use my_tracer::graphics::gl_wrapper::*;
@@ -76,8 +77,11 @@ fn main() {
     let start_time = Instant::now();
 
     let mut a = 1.0;
+    let mut time_last_frame = 0.0;
+
     while !window.should_close() {
-        egui_input_state.input.time = Some(start_time.elapsed().as_secs_f64());
+        let start_elapsed = start_time.elapsed();
+        egui_input_state.input.time = Some(start_elapsed.as_secs_f64());
         egui_ctx.begin_pass(egui_input_state.input.take());
         egui_input_state.pixels_per_point = native_pixels_per_point;
 
@@ -87,10 +91,8 @@ fn main() {
         }
         
         // Update scene anc convert render results into rgb8
-        scene.update(&mut pixels);
-        for i in 0..pixels.len(){
-            pixels_rgb8[i] = Math::rgbf32_to_rgb8(pixels[i]);
-        }
+        scene.update(start_elapsed.as_secs_f32() - time_last_frame, &mut pixels, &mut pixels_rgb8);
+        time_last_frame = start_elapsed.as_secs_f32();
 
         unsafe {          
             gl::Disable(gl::BLEND);
@@ -106,12 +108,9 @@ fn main() {
             gl::DrawElements(gl::TRIANGLES, 6, gl::UNSIGNED_INT, ptr::null());
         }
 
+        let end_elapsed = start_time.elapsed();
         egui::Window::new("Egui with GLFW").show(&egui_ctx, |ui| {
-            ui.label("A simple sine wave plotted onto a GL texture then blitted to an egui managed Image.");
-            ui.label(" ");
-            ui.label(" ");            
-            ui.add(egui::Slider::new(&mut a, 0.0..=50.0).text("Amplitude"));
-            ui.label(" ");
+            ui.label(format!("Elapsed: {}", 1.0 / (end_elapsed - start_elapsed).as_secs_f32()));
         });
 
         let egui::FullOutput {
